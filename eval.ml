@@ -5,6 +5,7 @@ exception SyntaxError of string
 exception Unapplicable
 exception TypeError
 
+let sprintf = Printf.sprintf
 let dEBUG = ref false
 
 type exp =
@@ -54,26 +55,27 @@ let rec string_of_value = function
 | VBool b -> string_of_bool b
 | VString s -> s
 | VCons (u,v) ->
-  Printf.sprintf "(%s,%s)"
+  sprintf "(%s,%s)"
     (string_of_value u) (string_of_value v)
 | VNil -> "`()"
 | VUnit -> "()"
 | VProcedure {env; params; body} ->
-  Printf.sprintf "λ:[%s]->[%s]"
+  sprintf "λ:[%s]->[%s]"
     (string_of_list ident params) (string_of_list string_of_exp body)
 | VPrimitive {name; arity; _} ->
-  Printf.sprintf "%s#%d" name arity
+  sprintf "%s#%d" name arity
 and string_of_ret x = string_of_value x
-and string_of_env env =
+and string_of_env ?(ln=false) env =
   let max_depth = 1 in
   let rec lp {frame; enclosing} depth =
     if depth > max_depth then "..."
     else
       let str_frame = Env.fold (fun k v str ->
-        (if str = "" then "" else str ^ ";")
+        (if str = "" then "" else str ^ ";" ^
+          (if ln then "\n  " else ""))
         ^ k ^ "=" ^ string_of_ret v
       ) frame "" in
-      Printf.sprintf "{frame={%s}; enclosing=%s}" str_frame
+      sprintf "{frame={%s}; enclosing=%s}" str_frame
         @@ match enclosing with
         | None -> "{}"
         | Some env' -> lp !env' (depth+1)
@@ -107,6 +109,11 @@ let rec eval exp env = match exp with
     | Var x -> x
     | _ -> raise @@ SyntaxError "not a variable") param_ls
     in VProcedure {env; params; body}
+  | (Var "if")::cond::consq::alt::[] -> (
+    match eval cond env with
+    | VBool true -> eval consq env
+    | VBool false -> eval alt env
+    | _ -> raise TypeError)
   | hd::_ ->
     let head = eval hd env in
     match head with
@@ -114,7 +121,7 @@ let rec eval exp env = match exp with
       let args = List.tl ls |> List.map (fun a -> eval a env) in
       apply head args
     | _ -> raise @@ SyntaxError (
-      Printf.sprintf "not implemented or invalid sexp: %s"
+      sprintf "not implemented or invalid sexp: %s"
       @@ string_of_exp exp
     )
 and eval_many exps env =
@@ -141,14 +148,49 @@ and apply proc args = match proc with
 | _ -> raise Unapplicable
 
 let interpret ast env =
-  let open Printf in
-  printf "============\n%!";
+  Printf.printf "============\n%!";
   List.iter (fun exp ->
-    printf "input : %s\n%!" @@ string_of_exp exp;
+    Printf.printf "input : %s\n%!" @@ string_of_exp exp;
     let ret = eval exp env in
-    printf "-->     %s\n%!" @@ string_of_ret ret;
-    if !dEBUG then printf "  (env: %s)\n%!"@@ string_of_env !env;
+    Printf.printf "-->     %s\n%!" @@ string_of_ret ret;
+    if !dEBUG then Printf.printf "  (env: %s)\n%!"@@ string_of_env !env;
   ) ast
+
+let vprim_of name = function
+| `I_I_I f -> {
+  name; arity=2;
+  func=function [VInt u; VInt v] -> VInt (f u v)
+  | _ -> raise TypeError }
+| `B_B_B f -> {
+  name; arity=2;
+  func=function [VBool u; VBool v] -> VBool (f u v)
+  | _ -> raise TypeError }
+| `Any_U f -> { name; arity=1; func=f }
+| `B_B f -> {
+  name; arity=1;
+  func=function [VBool v] -> VBool (f v)
+  | _ -> raise TypeError }
+| `B_U f -> {
+  name; arity=1;
+  func=function [VBool v] -> f v; VUnit
+  | _ -> raise TypeError }
+| `A_A_B f -> {
+  name; arity=2;
+  func=function [p; q] -> VBool (f p q)
+  | _ -> raise TypeError}
+| `n_U f -> {
+  name; arity=0;
+  func=function [] -> f (); VUnit
+  | _ -> raise TypeError
+}
+let add_vprims_to_frame frame prim_fun =
+  List.map (fun (name,value) ->
+    vprim_of name value
+  ) prim_fun
+  |> List.fold_left (fun frm prm ->
+    Env.add prm.name (VPrimitive prm) frm
+  ) frame
+
 
 let setup_env () =
   let env = {frame=Env.empty; enclosing=None} in
@@ -175,37 +217,16 @@ let setup_env () =
     "print",`Any_U (fun rets ->
       print_endline @@ string_of_list string_of_ret rets;
       VUnit);
-    "debug", `B_U (fun b -> dEBUG := b)
+    "debug", `B_U (fun b -> dEBUG := b);
+    "=", `A_A_B (=)
   ] in
   let frame = env.frame in
   let frame = List.fold_left (fun frm (var,value) ->
     Env.add var value frm
   ) frame prim_var in
-  let frame =
-    List.map (fun (name,value) -> match value with
-    | `I_I_I f -> {
-      name; arity=2;
-      func=function [VInt u; VInt v] -> VInt (f u v)
-      | _ -> raise TypeError }
-    | `B_B_B f -> {
-      name; arity=2;
-      func=function [VBool u; VBool v] -> VBool (f u v)
-      | _ -> raise TypeError }
-    | `Any_U f -> { name; arity=1; func=f }
-    | `B_B f -> {
-      name; arity=1;
-      func=function [VBool v] -> VBool (f v)
-      | _ -> raise TypeError }
-    | `B_U f -> {
-      name; arity=1;
-      func=function [VBool v] -> f v; VUnit
-      | _ -> raise TypeError }
-    ) prim_fun
-    |> List.fold_left (fun frm prm ->
-      Env.add prm.name (VPrimitive prm) frm
-    ) frame
+  let frame = add_vprims_to_frame frame prim_fun
   in
-  ref {env with frame}
+  {env with frame}
 
 let test () =
   interpret [
