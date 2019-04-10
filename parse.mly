@@ -1,6 +1,6 @@
 %token <int> NUMBER
 %token <string> STRING
-%token <string> SYMBOL
+%token <string> VARIABLE
 %token LEFT_PAREN RIGHT_PAREN EOF
 
 %start <Eval.exp option> prog
@@ -12,7 +12,7 @@ prog:
 ;
 exp:
   | v=self_eval   {v}
-  | s=SYMBOL      {Eval.Var s}
+  | s=VARIABLE    {Eval.Var s}
   | s=sexp        {Eval.LSexp s}
 ;
 self_eval:

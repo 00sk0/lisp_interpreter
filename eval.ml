@@ -18,6 +18,7 @@ type value =
 | VInt of int
 | VBool of bool
 | VString of string
+| VSymbol of string
 | VCons of value * value
 | VNil
 | VUnit
@@ -54,6 +55,7 @@ let rec string_of_value = function
 | VInt n -> string_of_int n
 | VBool b -> string_of_bool b
 | VString s -> s
+| VSymbol s -> "`" ^ s
 | VCons (u,v) ->
   sprintf "(%s,%s)"
     (string_of_value u) (string_of_value v)
@@ -109,7 +111,19 @@ let rec eval exp env = match exp with
     | Var x -> x
     | _ -> raise @@ SyntaxError "not a variable") param_ls
     in VProcedure {env; params; body}
-  | (Var "if")::cond::consq::alt::[] -> (
+  | [Var "quote"; body] -> (
+    let rec eval_quote body =
+      match body with
+    | LInt _ | LBool _ | LString _ -> eval body env
+    | Var x -> VSymbol x
+    | LSexp ls ->
+      let rec lp = function
+      | h::t -> VCons (eval_quote h, lp t)
+      | [] -> VNil
+      in lp ls
+    in eval_quote body
+  )
+  | [Var "if";cond;consq;alt] -> (
     match eval cond env with
     | VBool true -> eval consq env
     | VBool false -> eval alt env
@@ -181,8 +195,19 @@ let vprim_of name = function
 | `n_U f -> {
   name; arity=0;
   func=function [] -> f (); VUnit
-  | _ -> raise TypeError
-}
+  | _ -> raise TypeError }
+| `L_A f -> {
+  name; arity=1;
+  func=function [p] -> f p
+  | _ -> raise TypeError }
+| `L_L f -> {
+  name; arity=1;
+  func=function [p] -> f p
+  | _ -> raise TypeError }
+| `L_L_L f -> {
+  name; arity=2;
+  func=function [p;q] -> f p q
+  | _ -> raise TypeError }
 let add_vprims_to_frame frame prim_fun =
   List.map (fun (name,value) ->
     vprim_of name value
@@ -190,7 +215,6 @@ let add_vprims_to_frame frame prim_fun =
   |> List.fold_left (fun frm prm ->
     Env.add prm.name (VPrimitive prm) frm
   ) frame
-
 
 let setup_env () =
   let env = {frame=Env.empty; enclosing=None} in
@@ -218,7 +242,20 @@ let setup_env () =
       print_endline @@ string_of_list string_of_ret rets;
       VUnit);
     "debug", `B_U (fun b -> dEBUG := b);
-    "=", `A_A_B (=)
+    "=", `A_A_B (=);
+    "car", `L_A (function
+    | VCons (u,v) -> u
+    | _ -> raise TypeError);
+    "cdr", `L_L (function
+    | VCons (u,v) -> v
+    | _ -> raise TypeError);
+    "append", `L_L_L (fun u v ->
+      let rec lp = function
+      | VNil -> v
+      | VCons (p,q) -> VCons (p,lp q)
+      | _ -> raise TypeError
+      in lp u
+    );
   ] in
   let frame = env.frame in
   let frame = List.fold_left (fun frm (var,value) ->

@@ -70,8 +70,16 @@ let () =
     (debug false)
     (define fact
       (lambda (v)
-        (if (= v 0)
+        (define res (if (= v 1)
           1
-          (* (fact (- v 1)) v))))
+          (* (fact (- v 1)) v)))
+        (print res)
+        res))
+    (fact 5)
+    (define ls  (quote (1 2 3)))
+    (print ls)
+    (define ls2 (append ls ls))
+    (print ls2)
+    (print (car (cdr (cdr ls))))
   ";
   interpreter ()
