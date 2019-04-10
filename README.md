@@ -1,4 +1,4 @@
-# Lisp Interpreter
+# Lisp-like language Interpreter
 
 ```bash
 # run

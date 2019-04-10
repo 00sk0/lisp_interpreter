@@ -7,22 +7,9 @@ let rec parse lexbuf =
   | Some v -> v :: (parse lexbuf)
   | None -> []
 
-let env_global = ref @@ Eval.setup_env ()
-let rec add_more_prims () =
-  let open Eval in
-  let {frame;_} as env = !env_global in
-  let prim_fun = [
-    "show_env", `n_U (fun () ->
-      print_endline
-      @@ string_of_env ~ln:true !env_global);
-    "reset_env", `n_U (fun () ->
-      env_global := Eval.setup_env ();
-      add_more_prims ());
-    "help", `n_U (fun () ->
-      Printf.printf "lisp_interpreter\n");
-  ] in
-  env_global := {env with frame=add_vprims_to_frame frame prim_fun}
-let () = add_more_prims ()
+let env_global =
+  let e = ref @@ Eval.setup_env ()
+  in Eval.add_more_prims_env e; e
 
 let interpret str = (
   Lexing.from_string

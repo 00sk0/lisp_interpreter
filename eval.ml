@@ -167,7 +167,8 @@ let interpret ast env =
     Printf.printf "input : %s\n%!" @@ string_of_exp exp;
     let ret = eval exp env in
     Printf.printf "-->     %s\n%!" @@ string_of_ret ret;
-    if !dEBUG then Printf.printf "  (env: %s)\n%!"@@ string_of_env !env;
+    if !dEBUG then
+      Printf.printf "  (env: %s)\n%!"@@ string_of_env !env;
   ) ast
 
 let vprim_of name = function
@@ -265,46 +266,16 @@ let setup_env () =
   in
   {env with frame}
 
-let test () =
-  interpret [
-    LInt 42;
-    LInt 2434;
-  ] (ref {frame=Env.empty; enclosing=None});
-  interpret [
-    Var "x"
-  ] (ref {frame=Env.singleton "x" @@ VInt 2434; enclosing=None});
-  interpret [
-    Var "y"
-  ] (ref {
-    frame=Env.singleton "x" @@ VInt 2434; enclosing=Some (ref {
-      frame=Env.singleton "y" @@ VInt 42; enclosing=None
-    }
-  )});
-  interpret [
-    Var "x";
-    LSexp [Var "define"; Var "x"; LInt 42];
-    Var "x"
-  ] (ref {
-    frame=Env.singleton "x" @@ VInt 2434; enclosing=None
-  });
-  interpret [
-    LSexp [Var "lambda"; LSexp [Var "x"]; LSexp [Var "x"]];
-    LSexp [Var "define"; Var "f";
-      LSexp [Var "lambda"; LSexp [Var "x"];
-        Var "x"]];
-    LSexp [Var "f"; LInt 334];
-  ] (ref {frame=Env.empty; enclosing=None});
-  interpret [
-    LSexp [Var "+"; LInt 42; LInt 2434];
-    LSexp [Var "define"; Var "add100";
-      LSexp [Var "lambda"; LSexp [Var "v"];
-        LSexp [Var "+"; Var "v"; LInt 100]]];
-    LSexp [Var "add100"; LInt 2434];
-    LSexp [Var "+"; LInt 2; LInt 3];
-  ] (ref {frame=Env.singleton "+" @@ VPrimitive {
-    name="+"; arity=2; func=
-    function
-    | [VInt u;VInt v] ->
-      VInt (u+v) | _ -> raise TypeError
-  }; enclosing=None});
-
+let rec add_more_prims_env env_global =
+  let {frame;_} as env = !env_global in
+  let prim_fun = [
+    "show_env", `n_U (fun () ->
+      print_endline
+      @@ string_of_env ~ln:true !env_global);
+    "reset_env", `n_U (fun () ->
+      env_global := setup_env ();
+      add_more_prims_env env_global);
+    "help", `n_U (fun () ->
+      print_endline "This is a lisp interpreter written in OCaml.");
+  ] in
+  env_global := {env with frame=add_vprims_to_frame frame prim_fun}
