@@ -25,7 +25,12 @@ let interpreter () =
       try
         interpret !input;
         input := ""
-      with Parse.Error -> ()
+      with
+      | Parse.Error -> ()
+      | e -> (
+        prerr_endline @@ "\027[31mError : " ^  Printexc.to_string e ^ "\027[0m";
+        prerr_endline @@ Printexc.get_backtrace (); input := ""
+      )
     done
   with End_of_file -> print_endline "exit."
 
