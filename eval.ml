@@ -128,6 +128,13 @@ let rec eval exp env = match exp with
     | VBool true -> eval consq env
     | VBool false -> eval alt env
     | _ -> raise TypeError)
+  | (Var "list")::body -> (
+    let body = List.map (fun exp -> eval exp env) body in
+    let rec loop ls = function
+    | [] -> ls
+    | h::t -> loop (VCons (h,ls)) t in
+    loop VNil @@ List.rev body
+  )
   | hd::_ ->
     let head = eval hd env in
     match head with

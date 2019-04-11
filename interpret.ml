@@ -90,5 +90,15 @@ let () =
       (loop ls)))
     (member (quote (1 2 4 8)) (pow 2 3))
     (member (quote (1 2 4 8)) 5)
+    (define squares_ngt (lambda (limit)
+      (define loop (lambda (v ls)
+        (define p (* v v))
+        (if (> p limit)
+          ls
+          (loop (+ v 1) (append ls (list p))))))
+      (loop 0 (quote ()))))
+    (member (squares_ngt 100) (pow 2 3))
+    (member (squares_ngt 100) (pow 2 6))
+    (member (squares_ngt 100) (pow 2 8))
   |};
   interpreter ()
