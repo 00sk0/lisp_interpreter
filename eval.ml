@@ -40,7 +40,7 @@ and prim = {
   func : ret list -> ret
 }
 
-let string_of_list ?(separator=";") f ls =
+let string_of_list ?(separator=" ") f ls =
   let rec f0 a = match a with
   | [] -> "" | [h] -> (f h)
   | h::t -> (f h) ^ separator ^ (f0 t)
@@ -162,14 +162,15 @@ and apply proc args = match proc with
 | _ -> raise Unapplicable
 
 let interpret ast env =
-  Printf.printf "============\n%!";
   List.iter (fun exp ->
     Printf.printf "input : %s\n%!" @@ string_of_exp exp;
     let ret = eval exp env in
     Printf.printf "-->     %s\n%!" @@ string_of_ret ret;
     if !dEBUG then
       Printf.printf "  (env: %s)\n%!"@@ string_of_env !env;
-  ) ast
+    Printf.printf "\n%!";
+  ) ast;
+  Printf.printf "============\n%!"
 
 let vprim_of name = function
 | `I_I_I f -> {
@@ -180,7 +181,13 @@ let vprim_of name = function
   name; arity=2;
   func=function [VBool u; VBool v] -> VBool (f u v)
   | _ -> raise TypeError }
-| `Any_U f -> { name; arity=1; func=f }
+| `I_I_B f -> {
+  name; arity=2;
+  func=function [VInt u; VInt v] -> VBool (f u v)
+  | _ -> raise TypeError }
+| `Any_U f -> { name; arity=1;
+  func=function [v] -> f v
+  | _ -> raise TypeError }
 | `B_B f -> {
   name; arity=1;
   func=function [VBool v] -> VBool (f v)
@@ -199,16 +206,28 @@ let vprim_of name = function
   | _ -> raise TypeError }
 | `L_A f -> {
   name; arity=1;
-  func=function [p] -> f p
+  func=function [(VCons _) as p] | [VNil as p] -> f p
   | _ -> raise TypeError }
 | `L_L f -> {
   name; arity=1;
-  func=function [p] -> f p
+  func=function [(VCons _) as p] | [VNil as p] -> f p
   | _ -> raise TypeError }
 | `L_L_L f -> {
   name; arity=2;
-  func=function [p;q] -> f p q
+  func=function [p;q] -> (match p,q with
+    | VCons _,VCons _ | VCons _,VNil | VNil,VCons _ | VNil,VNil -> f p q
+    | _ -> raise TypeError)
   | _ -> raise TypeError }
+| `S_S_S f -> {
+  name; arity=2;
+  func=function [VString p;VString q] -> VString (f p q)
+  | _ -> raise TypeError
+}
+| `I_S f -> {
+  name; arity=1;
+  func=function [VInt p] -> VString (f p)
+  | _ -> raise TypeError
+}
 let add_vprims_to_frame frame prim_fun =
   List.map (fun (name,value) ->
     vprim_of name value
@@ -225,29 +244,34 @@ let setup_env () =
     "the_answer_to_everything", VInt 42
   ] in
   let prim_fun = [
-    "+",   `I_I_I (+);
-    "-",   `I_I_I (-);
-    "*",   `I_I_I ( * );
-    "/",   `I_I_I (/);
-    "pow", `I_I_I (fun u v ->
+    "+",    `I_I_I (+);
+    "-",    `I_I_I (-);
+    "*",    `I_I_I ( * );
+    "/",    `I_I_I (/);
+    "mod",  `I_I_I (mod);
+    "pow",  `I_I_I (fun u v ->
       let rec pow a n = function
       | 0 -> a | 1 -> n * a
       | k when k mod 2 = 0 -> pow a (n*n) (k/2)
       | k -> pow (a*n) (n*n) (k/2)
       in pow 1 u v
     );
+    "<",    `I_I_B (<);
+    ">",    `I_I_B (>);
+    "^",    `S_S_S (^);
+    "string_of_int",  `I_S (string_of_int);
     "and",  `B_B_B (&&);
     "or",   `B_B_B (||);
     "not",  `B_B (not);
-    "print",`Any_U (fun rets ->
-      print_endline @@ string_of_list string_of_ret rets;
+    "print",`Any_U (fun ret ->
+      print_endline @@ string_of_ret ret;
       VUnit);
-    "debug", `B_U (fun b -> dEBUG := b);
-    "=", `A_A_B (=);
-    "car", `L_A (function
+    "debug",`B_U (fun b -> dEBUG := b);
+    "=",    `A_A_B (=);
+    "car",  `L_A (function
     | VCons (u,v) -> u
     | _ -> raise TypeError);
-    "cdr", `L_L (function
+    "cdr",  `L_L (function
     | VCons (u,v) -> v
     | _ -> raise TypeError);
     "append", `L_L_L (fun u v ->

@@ -30,7 +30,7 @@ let interpreter () =
   with End_of_file -> print_endline "exit."
 
 let () =
-  interpret "
+  interpret {|
     (define x 128)
     (define add100 (lambda (v) (+ v 100)))
     (add100 the_answer_to_everything)
@@ -63,10 +63,32 @@ let () =
         (print res)
         res))
     (fact 5)
+    (define collatz (lambda (v)
+      (define loop (lambda (v step)
+        (print v)
+        (if (= v 1)
+          (print (^ (^ "converged in " (string_of_int step)) " steps"))
+          (if (= (mod v 2) 0)
+            (loop (/ v 2) (+ step 1))
+            (loop (+ ( * v 3) 1) (+ step 1))))))
+      (loop v 0)))
+    (collatz 3)
+    (show_env)
     (define ls  (quote (1 2 3)))
     (print ls)
     (define ls2 (append ls ls))
     (print ls2)
     (print (car (cdr (cdr ls))))
-  ";
+    (define null? (lambda (v) (= v (quote ()))))
+    (define member (lambda (ls v)
+      (define loop (lambda (ls)
+        (if (null? ls)
+          false
+          (if (= v (car ls))
+            true
+            (loop (cdr ls))))))
+      (loop ls)))
+    (member (quote (1 2 4 8)) (pow 2 3))
+    (member (quote (1 2 4 8)) 5)
+  |};
   interpreter ()
