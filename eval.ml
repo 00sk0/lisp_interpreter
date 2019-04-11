@@ -306,7 +306,9 @@ let rec add_more_prims_env env_global =
     "reset_env", `n_U (fun () ->
       env_global := setup_env ();
       add_more_prims_env env_global);
+    "about",`n_U (fun () ->
+      print_endline "This is a lisp-like language interpreter written in OCaml.");
     "help", `n_U (fun () ->
-      print_endline "This is a lisp interpreter written in OCaml.");
+      print_endline "I'm afraid there is no help yet.");
   ] in
   env_global := {env with frame=add_vprims_to_frame frame prim_fun}

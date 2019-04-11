@@ -15,3 +15,4 @@ $ make
   (b) ; prints 1
   ```
 * other examples are in interpret.ml
+* most of the function and special form names derive from OCaml, and may look strange.
