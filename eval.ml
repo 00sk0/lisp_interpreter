@@ -279,6 +279,14 @@ let vprim_of name = function
 | `n_F f -> {
   name; arity=0;
   func=function [] -> VFloat (f ()) | _ -> raise TypeError}
+| `S_I f -> {
+  name; arity=1;
+  func=function [VString s] -> VInt (f s) | _ -> raise TypeError}
+| `A_L_L f -> {
+  name; arity=2;
+  func=function [u; VCons _ as v] -> f u v
+  | [u; VNil] -> f u VNil
+  | _ -> raise TypeError}
 let add_vprims_to_frame frame prim_fun =
   List.map (fun (name,value) ->
     vprim_of name value
@@ -289,11 +297,28 @@ let add_vprims_to_frame frame prim_fun =
 
 let setup_env () =
   let env = {frame=Env.empty; enclosing=None} in
+  let rev_list ls =
+    let rec lp u v = match u,v with
+    | VNil,ret -> ret
+    | VCons (p,q),ret -> lp q (VCons (p,ret))
+    | _ -> raise TypeError in
+    lp ls VNil in
   let prim_var = [
     "true",  VBool true;
     "false", VBool false;
     "the_answer_to_everything", VInt 42;
     "pi", VFloat (2. *. acos 0.);
+    "explode", VPrimitive {
+      name="explode"; arity=1;
+      func=function [VString s] ->
+        let ls = List.init (String.length s) (fun i -> s.[i]) in
+        let str = String.make 1 in
+        let rec lp acc = function
+        | [] -> rev_list acc
+        | h::t -> lp (VCons (VString (str h),acc)) t
+        in lp VNil ls
+      | _ -> raise TypeError
+    }
   ] in
   let prim_fun = [
     "+",    `I_I_I (+);
@@ -311,6 +336,8 @@ let setup_env () =
     "<",    `A_A_B (<);
     ">",    `A_A_B (>);
     "^",    `S_S_S (^);
+    "<=",   `A_A_B (<=);
+    ">=",   `A_A_B (>=);
     "string_of_int",  `I_S (string_of_int);
     "and",  `B_B_B (&&);
     "or",   `B_B_B (||);
@@ -326,12 +353,14 @@ let setup_env () =
     "cdr",  `L_L (function
     | VCons (u,v) -> v
     | _ -> raise TypeError);
+    "cons", `A_L_L (fun u v -> VCons (u,v));
+    "rev",  `L_L (fun v -> rev_list v);
     "append", `L_L_L (fun u v ->
-      let rec lp = function
-      | VNil -> v
-      | VCons (p,q) -> VCons (p,lp q)
-      | _ -> raise TypeError
-      in lp u);
+      let rec lp acc u v = match u, v with
+      | VCons (p,q), r -> lp (VCons (p,acc)) q r
+      | VNil, VCons (p,q) -> lp (VCons (p, acc)) VNil q
+      | VNil, VNil -> rev_list acc
+      | _ -> raise TypeError in lp VNil u v);
     "read_int",   `n_I (fun () -> read_int ());
     "read_line",  `n_S (fun () -> read_line ());
     "read_string",`n_S (fun () -> Scanf.scanf " %s" ident);
@@ -355,7 +384,8 @@ let setup_env () =
     | VSymbol _ -> "symbol"
     | VPrimitive _ -> "prim"
     | VProcedure _ -> "fun");
-    "time_now", `n_F (Sys.time)
+    "time_now", `n_F (Sys.time);
+    "string_length", `S_I (String.length)
   ] in
   let frame = env.frame in
   let frame = List.fold_left (fun frm (var,value) ->
