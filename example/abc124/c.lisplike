@@ -1,3 +1,5 @@
+; https://atcoder.jp/contests/abc124/tasks/abc124_c
+
 (define min (lambda (u v)
   (if (> u v) v u)))
 

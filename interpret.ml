@@ -20,8 +20,8 @@ let interpret str = (
 let interpreter ic =
   let rec loop input =
     try
-      let input = input ^ "" ^ (input_line ic) in
-      if input <> "" then begin try
+      let input = input ^ "\n" ^ (input_line ic) in
+      begin try
         interpret input;
       with Parse.Error -> loop input end;
       loop ""
@@ -105,16 +105,18 @@ let () =
     (member (quote (1 2 4 8)) (pow 2 3))
     (member (quote (1 2 4 8)) 5)
     (define squares_ngt (lambda (limit)
+      ; list square numbers not greater than limit
       (define loop (lambda (v ls)
         (define p (* v v))
         (if (> p limit)
           ls
           (loop (+ v 1) (append ls (list p))))))
       (loop 0 (quote ()))))
-    (member (squares_ngt 100) (pow 2 3))
-    (member (squares_ngt 100) (pow 2 6))
-    (member (squares_ngt 100) (pow 2 8))
+    (member (squares_ngt 100) (pow 2 3)) ; 2^3 = 8
+    (member (squares_ngt 100) (pow 2 6)) ; 2^6 = 8^2 <= 100
+    (member (squares_ngt 100) (pow 2 8)) ; 2^8 = 16^2 > 100
     (define monte_pi (lambda (max)
+      ; estimate pi using monte-carlo method
       (define rand (lambda ()
         (define x (random_float 1.))
         (define y (random_float 1.))
@@ -126,7 +128,7 @@ let () =
       (print "pi:")
       (define pi2 (loop 0 0.))
       (print pi2)
-      (print "diff:")
+      (print "relative error:")
       (define fabs (lambda (v)
         (if (> v 0.) v (*. v -1.))))
       (print (fabs (/. (-. pi2 pi) pi)))))

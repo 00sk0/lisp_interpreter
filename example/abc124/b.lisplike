@@ -1,3 +1,5 @@
+; https://atcoder.jp/contests/abc124/tasks/abc124_b
+
 (define n (read_int))
 (define max (lambda (u v) (if (> u v) u v)))
 (define loop (lambda (count mx sum)

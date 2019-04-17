@@ -19,6 +19,10 @@ rule read = parse
 | ')'         {RIGHT_PAREN}
 | var as s    {VARIABLE s}
 | string as s {STRING (String.sub s 1 (String.length s - 2))}
+| ';'         {line_comment lexbuf}
 | _           {raise @@ SyntaxError ("unexpected: " ^ Lexing.lexeme lexbuf)}
 | eof         {EOF}
+and line_comment = parse
+| ('\n' | eof)  {read lexbuf}
+| _             {line_comment lexbuf}
 
