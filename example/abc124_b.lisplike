@@ -1,0 +1,9 @@
+(define n (read_int))
+(define max (lambda (u v) (if (> u v) u v)))
+(define loop (lambda (count mx sum)
+  (define hi (read_int))
+  (define sum (if (> mx hi) sum (+ sum 1)))
+  (if (= count n)
+    sum
+    (loop (+ count 1) (max mx hi) sum))))
+(loop 1 0 0)

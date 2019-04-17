@@ -1,0 +1,10 @@
+(define max (lambda (u v)
+  (if (> u v) u v)))
+(define min (lambda (u v)
+  (if (> u v) v u)))
+
+(define a (read_int))
+(define b (read_int))
+
+(define res (max (max (+ a b) (+ a (- a 1))) (+ b (- b 1))))
+(print res)
