@@ -1,4 +1,6 @@
-default:
+default: native
+
+byte:
 	ocamlbuild interpret.byte -use-menhir -cflags "-w -29 -g"
 	OCAMLRUNPARAM=b rlwrap ./_build/interpret.byte
 

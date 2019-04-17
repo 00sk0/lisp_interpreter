@@ -17,7 +17,7 @@ let interpret str = (
   *> Eval.interpret <? env_global) str;
   Printf.printf "\n\n%!"
 
-let interpreter ?(exit_if_fail=true) ic =
+let interpreter ic =
   let rec loop input =
     try
       let input = input ^ "" ^ (input_line ic) in
@@ -30,17 +30,18 @@ let interpreter ?(exit_if_fail=true) ic =
     | e ->
       prerr_endline @@ "\027[31mError : " ^  Printexc.to_string e ^ "\027[0m";
       prerr_endline @@ Printexc.get_backtrace ();
-      Printf.eprintf "eif: %b\n%!" exit_if_fail;
-      if not @@ exit_if_fail then loop "" else raise Exit
+      loop ""
   in loop ""
 
 let () =
   env_global := {!env_global with frame=
     Eval.Env.add "read_file" (Eval.VPrimitive {name="read_file"; arity=1;
       func=function [VString file] ->
-        let ic = open_in file in interpreter ic; close_in ic; VUnit
-      | _ -> raise Eval.TypeError }
-  ) !env_global.frame}
+        let ic = open_in file in
+        let str = really_input_string ic (in_channel_length ic) in
+        interpret str;
+        close_in ic; VUnit
+      | _ -> raise Eval.TypeError}) !env_global.frame}
 
 let () =
   interpret {|
@@ -137,5 +138,5 @@ let () =
     (time_internal (monte_pi 10000))
     (time (lambda () (monte_pi 10000)))
   |};
-  interpreter ~exit_if_fail:false stdin;
+  interpreter stdin;
   print_endline "exit."
