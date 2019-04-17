@@ -12,12 +12,14 @@ type exp =
 | LInt of int
 | LBool of bool
 | LString of string
+| LFloat of float
 | Var of string
 | LSexp of exp list
 type value =
 | VInt of int
 | VBool of bool
 | VString of string
+| VFloat of float
 | VSymbol of string
 | VCons of value * value
 | VNil
@@ -49,12 +51,14 @@ let rec string_of_exp = function
 | LInt n -> string_of_int n
 | LBool b -> string_of_bool b
 | LString s -> s
+| LFloat f -> string_of_float f
 | Var  x -> x
 | LSexp ls -> "[" ^ (string_of_list string_of_exp ls) ^ "]"
 let rec string_of_value = function
 | VInt n -> string_of_int n
 | VBool b -> string_of_bool b
 | VString s -> s
+| VFloat f -> string_of_float f
 | VSymbol s -> "`" ^ s
 | VCons (u,v) ->
   sprintf "(%s,%s)"
@@ -99,6 +103,7 @@ let rec eval exp env = match exp with
 | LInt n -> VInt n
 | LBool b -> VBool b
 | LString s -> VString s
+| LFloat f -> VFloat f
 | Var x -> lookup_variable x env
 | LSexp ls -> match ls with
   | [] -> raise @@ SyntaxError "lsexp should not be empty"
@@ -114,15 +119,14 @@ let rec eval exp env = match exp with
   | [Var "quote"; body] -> (
     let rec eval_quote body =
       match body with
-    | LInt _ | LBool _ | LString _ -> eval body env
+    | LInt _ | LBool _ | LString _ | LFloat _ -> eval body env
     | Var x -> VSymbol x
     | LSexp ls ->
       let rec lp = function
       | h::t -> VCons (eval_quote h, lp t)
       | [] -> VNil
       in lp ls
-    in eval_quote body
-  )
+    in eval_quote body)
   | [Var "if";cond;consq;alt] -> (
     match eval cond env with
     | VBool true -> eval consq env
@@ -133,8 +137,12 @@ let rec eval exp env = match exp with
     let rec loop ls = function
     | [] -> ls
     | h::t -> loop (VCons (h,ls)) t in
-    loop VNil @@ List.rev body
-  )
+    loop VNil @@ List.rev body)
+  | (Var "time_internal")::body ->
+    let tic = Sys.time () in
+    let _ = eval_many body env in
+    let toc = Sys.time () in
+    VFloat (toc -. tic)
   | hd::_ ->
     let head = eval hd env in
     match head with
@@ -228,13 +236,49 @@ let vprim_of name = function
 | `S_S_S f -> {
   name; arity=2;
   func=function [VString p;VString q] -> VString (f p q)
-  | _ -> raise TypeError
-}
+  | _ -> raise TypeError}
 | `I_S f -> {
   name; arity=1;
   func=function [VInt p] -> VString (f p)
-  | _ -> raise TypeError
-}
+  | _ -> raise TypeError}
+| `n_I f -> {
+  name; arity=0;
+  func=function [] -> VInt (f ())
+  | _ -> raise TypeError }
+| `n_S f -> {
+  name; arity=0;
+  func=function [] -> VString (f ())
+  | _ -> raise TypeError }
+| `F_F_F f -> {
+  name; arity=2;
+  func=function [VFloat u; VFloat v] -> VFloat (f u v)
+  | _ -> raise TypeError}
+| `I_F f -> {
+  name; arity=1;
+  func=function [VInt v] -> VFloat (f v)
+  | _ -> raise TypeError}
+| `F_I f -> {
+  name; arity=1;
+  func=function [VFloat v] -> VInt (f v)
+  | _ -> raise TypeError}
+| `F_F f -> {
+  name; arity=1;
+  func=function [VFloat v] -> VFloat (f v)
+  | _ -> raise TypeError}
+| `I_U f -> {
+  name; arity=1;
+  func=function [VInt v] -> (f v; VUnit)
+  | _ -> raise TypeError}
+| `A_S f -> {
+  name; arity=1;
+  func=function [v] -> (VString (f v))
+  | _ -> raise TypeError}
+| `A_A f -> {
+  name; arity=1;
+  func=function [v] -> f v | _ -> raise TypeError}
+| `n_F f -> {
+  name; arity=0;
+  func=function [] -> VFloat (f ()) | _ -> raise TypeError}
 let add_vprims_to_frame frame prim_fun =
   List.map (fun (name,value) ->
     vprim_of name value
@@ -248,7 +292,8 @@ let setup_env () =
   let prim_var = [
     "true",  VBool true;
     "false", VBool false;
-    "the_answer_to_everything", VInt 42
+    "the_answer_to_everything", VInt 42;
+    "pi", VFloat (2. *. acos 0.);
   ] in
   let prim_fun = [
     "+",    `I_I_I (+);
@@ -263,8 +308,8 @@ let setup_env () =
       | k -> pow (a*n) (n*n) (k/2)
       in pow 1 u v
     );
-    "<",    `I_I_B (<);
-    ">",    `I_I_B (>);
+    "<",    `A_A_B (<);
+    ">",    `A_A_B (>);
     "^",    `S_S_S (^);
     "string_of_int",  `I_S (string_of_int);
     "and",  `B_B_B (&&);
@@ -286,8 +331,31 @@ let setup_env () =
       | VNil -> v
       | VCons (p,q) -> VCons (p,lp q)
       | _ -> raise TypeError
-      in lp u
-    );
+      in lp u);
+    "read_int",   `n_I (fun () -> read_int ());
+    "read_line",  `n_S (fun () -> read_line ());
+    "read_string",`n_S (fun () -> Scanf.scanf " %s" ident);
+    "+.", `F_F_F (+.);
+    "*.", `F_F_F ( *. );
+    "-.", `F_F_F (-.);
+    "/.", `F_F_F (/.);
+    "fpow", `F_F_F ( ** );
+    "int_of_float", `F_I (int_of_float);
+    "float_of_int", `I_F (float_of_int);
+    "random_init", `I_U (Random.init);
+    "random_float", `F_F (Random.float);
+    "show_type", `A_S (function
+    | VInt _ -> "int"
+    | VBool _ -> "bool"
+    | VString _ -> "string"
+    | VFloat _  -> "float"
+    | VNil -> "list(empty)"
+    | VCons _ -> "list"
+    | VUnit -> "unit"
+    | VSymbol _ -> "symbol"
+    | VPrimitive _ -> "prim"
+    | VProcedure _ -> "fun");
+    "time_now", `n_F (Sys.time)
   ] in
   let frame = env.frame in
   let frame = List.fold_left (fun frm (var,value) ->
@@ -310,5 +378,6 @@ let rec add_more_prims_env env_global =
       print_endline "This is a lisp-like language interpreter written in OCaml.");
     "help", `n_U (fun () ->
       print_endline "I'm afraid there is no help yet.");
+    "exit", `n_U (fun () -> raise Exit);
   ] in
   env_global := {env with frame=add_vprims_to_frame frame prim_fun}

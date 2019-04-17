@@ -18,21 +18,58 @@ let interpret str = (
   Printf.printf "\n\n%!"
 
 let interpreter () =
+  let rec loop input =
+    try
+      let input = input ^ " " ^ (read_line ()) in
+      begin try
+        interpret input;
+      with Parse.Error -> loop input end;
+      loop ""
+    with
+    | End_of_file | Exit -> print_endline "exit."
+    | e ->
+      prerr_endline @@ "\027[31mError : " ^  Printexc.to_string e ^ "\027[0m";
+      prerr_endline @@ Printexc.get_backtrace ();
+      loop ""
+  in
+  loop ""
+  (* let rec loop input =
+    let input = ref input in
+    try
+      while true do
+        input := !input ^ " " ^ (read_line ());
+        interpret !input;
+        input := ""
+      done
+    with
+    | Parse.Error ->
+
+  in
+  let input = ref "" in
   try
+    while true do
+      input := !input ^ " " ^ (read_line ());
+      interpret !input;
+      input := ""
+    done
+  with
+  | End_of_file | Exit -> print_endline "exit."
+  | Parse.Error ->  *)
+  (* try
     let input = ref "" in
     while true do
       input := !input ^ " " ^ (read_line ());
       try
-        interpret !input;
-        input := ""
       with
       | Parse.Error -> ()
+      | Exit -> raise Exit
       | e -> (
         prerr_endline @@ "\027[31mError : " ^  Printexc.to_string e ^ "\027[0m";
         prerr_endline @@ Printexc.get_backtrace (); input := ""
       )
     done
-  with End_of_file -> print_endline "exit."
+  with
+  | End_of_file | Exit -> print_endline "exit." *)
 
 let () =
   interpret {|
@@ -105,5 +142,28 @@ let () =
     (member (squares_ngt 100) (pow 2 3))
     (member (squares_ngt 100) (pow 2 6))
     (member (squares_ngt 100) (pow 2 8))
+    (define monte_pi (lambda (max)
+      (define rand (lambda ()
+        (define x (random_float 1.))
+        (define y (random_float 1.))
+        (if (> (+. (*. x x) (*. y y)) 1.) 0. 1.)))
+      (define loop (lambda (count sum)
+        (if (= count max)
+          (/. (*. 4. sum) (float_of_int max))
+          (loop (+ count 1) (+. sum (rand))))))
+      (print "pi:")
+      (define pi2 (loop 0 0.))
+      (print pi2)
+      (print "diff:")
+      (define fabs (lambda (v)
+        (if (> v 0.) v (*. v -1.))))
+      (print (fabs (/. (-. pi2 pi) pi)))))
+    (define time (lambda (v)
+      (define tic (time_now))
+      (v)
+      (define toc (time_now))
+      (-. toc tic)))
+    (time_internal (monte_pi 10000))
+    (time (lambda () (monte_pi 10000)))
   |};
   interpreter ()

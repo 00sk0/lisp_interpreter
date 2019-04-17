@@ -1,4 +1,5 @@
 %token <int> NUMBER
+%token <float> FLOAT
 %token <string> STRING
 %token <string> VARIABLE
 %token LEFT_PAREN RIGHT_PAREN EOF
@@ -18,6 +19,7 @@ exp:
 self_eval:
   | n=NUMBER      {Eval.LInt n}
   | s=STRING      {Eval.LString s}
+  | f=FLOAT       {Eval.LFloat f}
 ;
 sexp:
   | LEFT_PAREN ls=sexp_list RIGHT_PAREN {ls}
