@@ -35,7 +35,7 @@ let interpreter ic =
 
 let () =
   env_global := {!env_global with frame=
-    Eval.Env.add "read_file" (Eval.VPrimitive {name="read_file"; arity=1;
+    Eval.Env.add "read_file" (Eval.VPrimitive {name="read_file";
       func=function [VString file] ->
         let ic = open_in file in
         let str = really_input_string ic (in_channel_length ic) in
