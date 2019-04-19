@@ -36,10 +36,7 @@ and proc = {
   params: string list;
   body: exp list
 }
-and prim = {
-  name: string;
-  func : ret list -> ret
-}
+and prim = ret list -> ret
 
 let string_of_list ?(separator=" ") f ls =
   let rec f0 a = match a with
@@ -67,8 +64,7 @@ let rec string_of_value = function
 | VProcedure {env; params; body} ->
   sprintf "λ:[%s]->[%s]"
     (string_of_list ident params) (string_of_list string_of_exp body)
-| VPrimitive {name; _} ->
-  sprintf "%s(prim)" name
+| VPrimitive _ -> "<primitive>"
 and string_of_ret x = string_of_value x
 and string_of_env ?(ln=false) env =
   let max_depth = 1 in
@@ -169,8 +165,7 @@ and apply proc args = match proc with
       ) e0.frame params args
     } in
   eval_many body env'
-| VPrimitive {func; _} ->
-  func args
+| VPrimitive func -> func args
 | _ -> raise Unapplicable
 
 let interpret ast env =
@@ -184,112 +179,63 @@ let interpret ast env =
   ) ast;
   Printf.printf "============\n%!"
 
-let vprim_of name = function
-| `I_I_I f -> {
-  name;
-  func=function [VInt u; VInt v] -> VInt (f u v)
-  | _ -> raise TypeError }
-| `B_B_B f -> {
-  name;
-  func=function [VBool u; VBool v] -> VBool (f u v)
-  | _ -> raise TypeError }
-| `I_I_B f -> {
-  name;
-  func=function [VInt u; VInt v] -> VBool (f u v)
-  | _ -> raise TypeError }
-| `Any_U f -> { name;
-  func=function [v] -> f v
-  | _ -> raise TypeError }
-| `B_B f -> {
-  name;
-  func=function [VBool v] -> VBool (f v)
-  | _ -> raise TypeError }
-| `B_U f -> {
-  name;
-  func=function [VBool v] -> f v; VUnit
-  | _ -> raise TypeError }
-| `A_A_B f -> {
-  name;
-  func=function [p; q] -> VBool (f p q)
-  | _ -> raise TypeError}
-| `n_U f -> {
-  name;
-  func=function [] -> f (); VUnit
-  | _ -> raise TypeError }
-| `L_A f -> {
-  name;
-  func=function [(VCons _) as p] | [VNil as p] -> f p
-  | _ -> raise TypeError }
-| `L_L f -> {
-  name;
-  func=function [(VCons _) as p] | [VNil as p] -> f p
-  | _ -> raise TypeError }
-| `L_L_L f -> {
-  name;
-  func=function [p;q] -> (match p,q with
+let vprim_of name pat = name, match pat with
+| `I_I_I f -> (function [VInt u; VInt v] -> VInt (f u v)
+  | _ -> raise TypeError)
+| `B_B_B f -> (function [VBool u; VBool v] -> VBool (f u v)
+  | _ -> raise TypeError)
+| `I_I_B f -> (function [VInt u; VInt v] -> VBool (f u v)
+  | _ -> raise TypeError)
+| `Any_U f -> (function [v] -> f v
+  | _ -> raise TypeError)
+| `B_B f -> (function [VBool v] -> VBool (f v)
+  | _ -> raise TypeError)
+| `B_U f -> (function [VBool v] -> f v; VUnit
+  | _ -> raise TypeError)
+| `A_A_B f -> (function [p; q] -> VBool (f p q)
+  | _ -> raise TypeError)
+| `n_U f -> (function [] -> f (); VUnit
+  | _ -> raise TypeError)
+| `L_A f -> (function [(VCons _) as p] | [VNil as p] -> f p
+  | _ -> raise TypeError)
+| `L_L f -> (function [(VCons _) as p] | [VNil as p] -> f p
+  | _ -> raise TypeError)
+| `L_L_L f -> (function [p;q] -> (match p,q with
     | VCons _,VCons _ | VCons _,VNil | VNil,VCons _ | VNil,VNil -> f p q
     | _ -> raise TypeError)
-  | _ -> raise TypeError }
-| `S_S_S f -> {
-  name;
-  func=function [VString p;VString q] -> VString (f p q)
-  | _ -> raise TypeError}
-| `I_S f -> {
-  name;
-  func=function [VInt p] -> VString (f p)
-  | _ -> raise TypeError}
-| `n_I f -> {
-  name;
-  func=function [] -> VInt (f ())
-  | _ -> raise TypeError }
-| `n_S f -> {
-  name;
-  func=function [] -> VString (f ())
-  | _ -> raise TypeError }
-| `F_F_F f -> {
-  name;
-  func=function [VFloat u; VFloat v] -> VFloat (f u v)
-  | _ -> raise TypeError}
-| `I_F f -> {
-  name;
-  func=function [VInt v] -> VFloat (f v)
-  | _ -> raise TypeError}
-| `F_I f -> {
-  name;
-  func=function [VFloat v] -> VInt (f v)
-  | _ -> raise TypeError}
-| `F_F f -> {
-  name;
-  func=function [VFloat v] -> VFloat (f v)
-  | _ -> raise TypeError}
-| `I_U f -> {
-  name;
-  func=function [VInt v] -> (f v; VUnit)
-  | _ -> raise TypeError}
-| `A_S f -> {
-  name;
-  func=function [v] -> (VString (f v))
-  | _ -> raise TypeError}
-| `A_A f -> {
-  name;
-  func=function [v] -> f v | _ -> raise TypeError}
-| `n_F f -> {
-  name;
-  func=function [] -> VFloat (f ()) | _ -> raise TypeError}
-| `S_I f -> {
-  name;
-  func=function [VString s] -> VInt (f s) | _ -> raise TypeError}
-| `A_L_L f -> {
-  name;
-  func=function [u; VCons _ as v] -> f u v
+  | _ -> raise TypeError)
+| `S_S_S f -> (function [VString p;VString q] -> VString (f p q)
+  | _ -> raise TypeError)
+| `I_S f -> (function [VInt p] -> VString (f p)
+  | _ -> raise TypeError)
+| `n_I f -> (function [] -> VInt (f ())
+  | _ -> raise TypeError)
+| `n_S f -> (function [] -> VString (f ())
+  | _ -> raise TypeError)
+| `F_F_F f -> (function [VFloat u; VFloat v] -> VFloat (f u v)
+  | _ -> raise TypeError)
+| `I_F f -> (function [VInt v] -> VFloat (f v)
+  | _ -> raise TypeError)
+| `F_I f -> (function [VFloat v] -> VInt (f v)
+  | _ -> raise TypeError)
+| `F_F f -> (function [VFloat v] -> VFloat (f v)
+  | _ -> raise TypeError)
+| `I_U f -> (function [VInt v] -> (f v; VUnit)
+  | _ -> raise TypeError)
+| `A_S f -> (function [v] -> (VString (f v))
+  | _ -> raise TypeError)
+| `A_A f -> (function [v] -> f v | _ -> raise TypeError)
+| `n_F f -> (function [] -> VFloat (f ()) | _ -> raise TypeError)
+| `S_I f -> (function [VString s] -> VInt (f s) | _ -> raise TypeError)
+| `A_L_L f -> (function [u; VCons _ as v] -> f u v
   | [u; VNil] -> f u VNil
-  | _ -> raise TypeError}
+  | _ -> raise TypeError)
 let add_vprims_to_frame frame prim_fun =
   List.map (fun (name,value) ->
     vprim_of name value
   ) prim_fun
-  |> List.fold_left (fun frm prm ->
-    Env.add prm.name (VPrimitive prm) frm
+  |> List.fold_left (fun frm (name,prm) ->
+    Env.add name (VPrimitive prm) frm
   ) frame
 
 let setup_env () =
@@ -305,22 +251,18 @@ let setup_env () =
     "false", VBool false;
     "the_answer_to_everything", VInt 42;
     "pi", VFloat (2. *. acos 0.);
-    "explode", VPrimitive {
-      name="explode";
-      func=function [VString s] ->
+    "explode", VPrimitive (function
+      | [VString s] ->
         let ls = List.init (String.length s) (fun i -> s.[i]) in
         let str = String.make 1 in
         let rec lp acc = function
         | [] -> rev_list acc
         | h::t -> lp (VCons (VString (str h),acc)) t
         in lp VNil ls
-      | _ -> raise TypeError
-    };
-    "print", VPrimitive {
-      name="print";
-      func=fun ls ->
-        print_endline @@ String.concat " " @@ List.map string_of_ret ls;
-        VUnit }
+      | _ -> raise TypeError);
+    "print", VPrimitive (fun ls ->
+      print_endline @@ String.concat " " @@ List.map string_of_ret ls;
+      VUnit)
   ] in
   let prim_fun = [
     "+",    `I_I_I (+);
@@ -344,9 +286,6 @@ let setup_env () =
     "and",  `B_B_B (&&);
     "or",   `B_B_B (||);
     "not",  `B_B (not);
-    (* "print",`Any_U (fun ret ->
-      print_endline @@ string_of_ret ret;
-      VUnit); *)
     "debug",`B_U (fun b -> dEBUG := b);
     "=",    `A_A_B (=);
     "car",  `L_A (function

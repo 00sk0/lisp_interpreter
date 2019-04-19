@@ -35,13 +35,12 @@ let interpreter ic =
 
 let () =
   env_global := {!env_global with frame=
-    Eval.Env.add "read_file" (Eval.VPrimitive {name="read_file";
-      func=function [VString file] ->
+    Eval.Env.add "read_file" (Eval.VPrimitive (function [VString file] ->
         let ic = open_in file in
         let str = really_input_string ic (in_channel_length ic) in
         interpret str;
         close_in ic; VUnit
-      | _ -> raise Eval.TypeError}) !env_global.frame}
+      | _ -> raise Eval.TypeError)) !env_global.frame}
 
 let () =
   interpret {|
@@ -125,13 +124,11 @@ let () =
         (if (= count max)
           (/. (*. 4. sum) (float_of_int max))
           (loop (+ count 1) (+. sum (rand))))))
-      (print "pi:")
       (define pi2 (loop 0 0.))
-      (print pi2)
-      (print "relative error:")
+      (print "pi:" pi2)
       (define fabs (lambda (v)
         (if (> v 0.) v (*. v -1.))))
-      (print (fabs (/. (-. pi2 pi) pi)))))
+      (print "relative error:" (fabs (/. (-. pi2 pi) pi)))))
     (define time (lambda (v)
       (define tic (time_now))
       (v)
