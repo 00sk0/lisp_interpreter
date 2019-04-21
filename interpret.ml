@@ -35,7 +35,8 @@ let interpreter ic =
 
 let () =
   env_global := {!env_global with frame=
-    Eval.Env.add "read_file" (Eval.VPrimitive (function [VString file] ->
+    Eval.Env.add "load_file" (Eval.VPrimitive (function
+      | [VString file] ->
         let ic = open_in file in
         let str = really_input_string ic (in_channel_length ic) in
         interpret str;
@@ -136,6 +137,8 @@ let () =
       (-. toc tic)))
     (time_internal (monte_pi 10000))
     (time (lambda () (monte_pi 10000)))
+    (load_file "example/list.lisplike")
+    (filter (lambda (v) (= (mod v 2) 0)) (squares_ngt 100))
   |};
   interpreter stdin;
   print_endline "exit."

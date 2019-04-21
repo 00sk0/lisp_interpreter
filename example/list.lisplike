@@ -1,0 +1,66 @@
+(define null? (lambda (v) (= v (quote ()))))
+(define member (lambda (ls v)
+  (define loop (lambda (ls)
+    (if (null? ls)
+      false
+      (if (= v (car ls))
+        true
+        (loop (cdr ls))))))
+  (loop ls)))
+
+(define fold_left (lambda (proc acc ls)
+  (define loop (lambda (acc ls)
+    (if (null? ls)
+      acc
+      (loop (proc acc (car ls)) (cdr ls)))))
+  (loop acc ls)))
+
+(define iter (lambda (proc ls)
+  (if (null? ls)
+    (quote ())
+    (cdr (list
+      (proc (car ls))
+      (iter proc (cdr ls)))))))
+; (iter print (quote (1 2 3)))
+
+(define filter (lambda (f ls)
+  (define loop (lambda (ls acc)
+    (if (null? ls)
+      acc
+      (loop (cdr ls)
+        (if (f (car ls))
+          (cons (car ls) acc)
+          acc)))))
+  (rev (loop ls (quote ())))))
+; (filter (lambda (v) (= (mod v 2) 0)) (quote (1 2 3 4 5)))
+
+(define remove (lambda (f ls)
+  (define loop (lambda (ls acc)
+    (if (null? ls)
+      (rev acc)
+      (if (f (car ls))
+        (append (rev acc) (cdr ls))
+        (loop (cdr ls) (cons (car ls) acc))))))
+  (loop ls (quote ()))))
+; (remove (lambda (v) (= v 2)) (quote (1 2 3 4 3 2 1)))
+
+(define remove_all (lambda (f ls)
+  (define loop (lambda (ls acc)
+    (if (null? ls)
+      (rev acc)
+      (if (f (car ls))
+        (loop (cdr ls) acc)
+        (loop (cdr ls) (cons (car ls) acc))))))
+  (loop ls (quote ()))))
+; (remove_all (lambda (v) (= v 2)) (quote (1 2 3 4 3 2 1)))
+
+(define cadr (lambda (ls) (car (cdr ls))))
+(define cddr (lambda (ls) (cdr (cdr ls))))
+
+(define length (lambda (ls)
+  (define loop (lambda (count ls)
+    (if (null? ls)
+      count
+      (loop (+ count 1) (cdr ls)))))
+  (loop 0 ls)))
+; (length (quote (1 2 (3 4 5) 6 7)))
